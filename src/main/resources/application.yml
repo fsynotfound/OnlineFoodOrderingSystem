@@ -1,0 +1,24 @@
+server:
+  port: 8080
+spring:
+  application:
+    #应用的名称，可选
+    name: reggie_take_out
+  datasource:
+    druid:
+      driver-class-name: com.mysql.jdbc.Driver  #这个地方不能写成com.mysql.cj.jdbc.Driver,否则运行不了springboot
+      url: jdbc:mysql://localhost:3306/reggie?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true
+      username: root
+      password: 12345678
+mybatis-plus:
+  configuration:
+    #在映射实体或者属性时，将数据库中表名和字段名中的下划线去掉，按照驼峰命名法映射
+    #比如表名叫address_book,实体类的类名叫AddressBook，这样就能映射
+    #表里的字段和类里的属性，也能这样映射，例如user_name和userName
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: ASSIGN_ID
+reggie:
+  path: /Users/fanshuyao/Desktop/OnlineMealOrderingSystem/dishes/img
