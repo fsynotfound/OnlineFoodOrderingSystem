@@ -8,6 +8,7 @@ import com.fanshuyao.reggie.utils.ValidateCodeUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -15,13 +16,18 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpSession;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/user")
 @Slf4j
 public class UserController {
+
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private RedisTemplate redisTemplate;
 
     /**
      * 发送手机短信验证码
@@ -36,19 +42,23 @@ public class UserController {
         if(StringUtils.isNotEmpty(phone)){
             //生成随机的4位验证码
             String code = ValidateCodeUtils.generateValidateCode(4).toString();
-            log.info("code={}",code); //将4位数验证码打印在IDEA控制台
+            log.info("code={}",code);
 
             //调用阿里云提供的短信服务API完成发送短信
             //SMSUtils.sendMessage("瑞吉外卖","",phone,code);
 
             //需要将生成的验证码保存到Session
-            session.setAttribute(phone,code);
+            //session.setAttribute(phone,code);
+
+            //将生成的验证码缓存到Redis中，并且设置有效期为5分钟
+            redisTemplate.opsForValue().set(phone,code,5,TimeUnit.MINUTES);
 
             return R.success("手机验证码短信发送成功");
         }
 
         return R.error("短信发送失败");
     }
+
     /**
      * 移动端用户登录
      * @param map
@@ -56,8 +66,7 @@ public class UserController {
      * @return
      */
     @PostMapping("/login")
-    public R<String> login(@RequestBody Map map, HttpSession session){
-        //user对象中没有code属性，因此可以使用map，也可以使用dto
+    public R<User> login(@RequestBody Map map, HttpSession session){
         log.info(map.toString());
 
         //获取手机号
@@ -67,8 +76,10 @@ public class UserController {
         String code = map.get("code").toString();
 
         //从Session中获取保存的验证码
-        //输入session.getAttribute(phone).var后按回车键，自动生成等号左边
-        Object codeInSession = session.getAttribute(phone);
+        //Object codeInSession = session.getAttribute(phone);
+
+        //从Redis中获取缓存的验证码
+        Object codeInSession = redisTemplate.opsForValue().get(phone);
 
         //进行验证码的比对（页面提交的验证码和Session中保存的验证码比对）
         if(codeInSession != null && codeInSession.equals(code)){
@@ -85,9 +96,14 @@ public class UserController {
                 user.setStatus(1);
                 userService.save(user);
             }
-            session.setAttribute("user",user.getId());//如果不写这一句，过滤器就会进行拦截
-            return R.success("登陆成功"); //前端页面没有用到data,不理解返回值为什么是user，自己修改成了string
+            session.setAttribute("user",user.getId());
+
+            //如果用户登录成功，删除Redis中缓存的验证码
+            redisTemplate.delete(phone);
+
+            return R.success(user);
         }
         return R.error("登录失败");
     }
+
 }
