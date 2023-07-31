@@ -117,7 +117,7 @@ public class SetmealController {
      * @param setmeal
      * @return
      */
-    @GetMapping("/list")
+    @GetMapping("/list")              //key需要和查询条件保持一致（124-125）
     @Cacheable(value = "setmealCache",key = "#setmeal.categoryId + '_' + #setmeal.status")
     public R<List<Setmeal>> list(Setmeal setmeal){
         LambdaQueryWrapper<Setmeal> queryWrapper = new LambdaQueryWrapper<>();
