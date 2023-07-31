@@ -12,15 +12,22 @@ import com.fanshuyao.reggie.service.SetmealService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * 套餐管理
+ */
+
 @RestController
 @RequestMapping("/setmeal")
 @Slf4j
 public class SetmealController {
+
     @Autowired
     private SetmealService setmealService;
 
@@ -36,13 +43,16 @@ public class SetmealController {
      * @return
      */
     @PostMapping
+    @CacheEvict(value = "setmealCache",allEntries = true)
     public R<String> save(@RequestBody SetmealDto setmealDto){
         log.info("套餐信息：{}",setmealDto);
 
         setmealService.saveWithDish(setmealDto);
 
         return R.success("新增套餐成功");
-    }/**
+    }
+
+    /**
      * 套餐分页查询
      * @param page
      * @param pageSize
@@ -50,7 +60,7 @@ public class SetmealController {
      * @return
      */
     @GetMapping("/page")
-    public R<Page> page(int page, int pageSize, String name){
+    public R<Page> page(int page,int pageSize,String name){
         //分页构造器对象
         Page<Setmeal> pageInfo = new Page<>(page,pageSize);
         Page<SetmealDto> dtoPage = new Page<>();
@@ -65,14 +75,13 @@ public class SetmealController {
 
         //对象拷贝
         BeanUtils.copyProperties(pageInfo,dtoPage,"records");
-        //泛型不一样，一个是setmeal类型，一个是setmealdto类型，所以records不需要拷贝
         List<Setmeal> records = pageInfo.getRecords();
 
-        List<SetmealDto> list = records.stream().map((item) -> { //item表示的是每一个Setmeal对象
+        List<SetmealDto> list = records.stream().map((item) -> {
             SetmealDto setmealDto = new SetmealDto();
             //对象拷贝
             BeanUtils.copyProperties(item,setmealDto);
-            //分类id,打item.getCategoryId().var会自动补全等号前的部分
+            //分类id
             Long categoryId = item.getCategoryId();
             //根据分类id查询分类对象
             Category category = categoryService.getById(categoryId);
@@ -87,12 +96,14 @@ public class SetmealController {
         dtoPage.setRecords(list);
         return R.success(dtoPage);
     }
+
     /**
      * 删除套餐
      * @param ids
      * @return
      */
     @DeleteMapping
+    @CacheEvict(value = "setmealCache",allEntries = true)
     public R<String> delete(@RequestParam List<Long> ids){
         log.info("ids:{}",ids);
 
@@ -100,13 +111,15 @@ public class SetmealController {
 
         return R.success("套餐数据删除成功");
     }
+
     /**
      * 根据条件查询套餐数据
      * @param setmeal
      * @return
      */
     @GetMapping("/list")
-    public R<List<Setmeal>> list(Setmeal setmeal){//只有传过来的参数是json数据的情况下，才需要加requestbody
+    @Cacheable(value = "setmealCache",key = "#setmeal.categoryId + '_' + #setmeal.status")
+    public R<List<Setmeal>> list(Setmeal setmeal){
         LambdaQueryWrapper<Setmeal> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(setmeal.getCategoryId() != null,Setmeal::getCategoryId,setmeal.getCategoryId());
         queryWrapper.eq(setmeal.getStatus() != null,Setmeal::getStatus,setmeal.getStatus());
@@ -116,5 +129,4 @@ public class SetmealController {
 
         return R.success(list);
     }
-
 }
